@@ -1,0 +1,74 @@
+<html>
+<head>
+    <title>Game of Three</title>
+    <script src="https://code.jquery.com/jquery-1.10.2.js"></script>
+</head>
+<body>
+<input type="checkbox" name="automatic" id="automatic" value="">Automatic Game<br>
+<input type="submit" value="Start game" id="startGame">
+</br></br>
+<label for="gameId">Game</label>
+<input type="text" name="gameId" id="gameId" readonly>
+</br></br>
+<label for="playerId">Player</label>
+<input type="text" name="playerId" id="playerId" readonly>
+</br></br>
+<label for="number">Number</label>
+<input type="text" name="number" id="number">
+<input type="submit" value="Send number" id="sendNumber">
+</br></br>
+<label for="result">Moves</label>
+<p id="result"></p>
+
+<script type="text/javascript">
+
+    $("#startGame").click(function (event) {
+        $("#result").empty();
+
+        $.post('/game/player').done(function (data) {
+            $("#gameId").val(data.gameId);
+            $("#playerId").val(data.playerId);
+            var source = new EventSource('/game/' + data.gameId + '/' + data.playerId);
+            source.onmessage = function (event) {
+                var move = $.parseJSON(event.data);
+                $("#result").append('Player: ' + move.player + ', Number: ' + move.number + ', Next Number: ' + move.nextNumber + ', Added: ' + move.added);
+                $("#result").append('<br/>');
+
+                if ($("#automatic").is(":checked") && !move.gameFinished && move.player != data.playerId) {
+                    sendNumber(move.nextNumber);
+                }
+                if (move.gameFinished) {
+                    $("#result").append('Game over!<br/>');
+                    source.close();
+                }
+            };
+        });
+    });
+
+    $("#sendNumber").click(function (event) {
+        var player = $("#playerId").val();
+        var number = $("#number").val();
+        if (player == '') {
+            $("#result").append('Invalid move... Start the game first! <br/>');
+        } else if (number == '') {
+            $("#result").append('Invalid move... Insert a number to send! <br/>');
+        } else {
+            sendNumber(number);
+        }
+        $("#number").val('');
+    });
+
+    function sendNumber(nextNumber) {
+        var t1 = $("#gameId").val();
+        var t2 = $("#playerId").val();
+        $.post('/playGame/sendNumber', {gameId: t1, playerId: t2, number: nextNumber})
+                .done(function (data) {
+                    if (data != '') {
+                        var error = $.parseJSON(data);
+                        $("#result").append(error.errorMessage + '<br/>');
+                    }
+                });
+    }
+</script>
+</body>
+</html>
